@@ -1,0 +1,5 @@
+{
+  "name": "trying translate",
+  "description": "A specialized tool for translating e-commerce product CSV files from English to Hebrew using the Gemini API, specifically targeting product names, descriptions, and attributes while preserving HTML structure.",
+  "requestFramePermissions": []
+}
