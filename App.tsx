@@ -3,9 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { Upload, FileDown, AlertCircle, Loader2, Play, Info, Sparkles, Clock, Zap, Globe, Settings2, ShieldCheck, X, ChevronDown, LayoutTemplate, FileSpreadsheet, Keyboard, ShoppingCart, Link as LinkIcon, Search, Image as ImageIcon, CheckSquare, Square, LogOut, RefreshCw, Save, ArrowRightLeft, CheckCircle2, RotateCcw, Cpu, Undo2, Redo2, PenTool } from 'lucide-react';
 import Papa from 'papaparse';
-import { ProductRow, TranslationStatus, isRecommended, isTechnical, OptimizationMode, MODE_LABELS, StructureMode, AIConfig } from './types';
+import { ProductRow, TranslationStatus, isRecommended, isTechnical, OptimizationMode, MODE_LABELS, StructureMode, AIConfig, COLUMN_LABELS_HE } from './types';
 import { AIService } from './services/geminiService';
 import { fetchShopifyProducts, updateShopifyProduct, ShopifyCredentials, fetchShopifyBlogs, createShopifyArticle } from './services/shopifyService';
+import { calculateSeoScore } from './services/seoScorer';
 
 // Default credentials - Updated to user provided
 const DEFAULT_CREDS: ShopifyCredentials = {
@@ -139,9 +140,9 @@ export default function App() {
             const validKeys = keys.filter(k => k !== 'image' && k !== 'id' && k !== 'status' && k !== 'permalink');
             setAllColumns(validKeys);
             
-            // Default selected columns for SEO & Options
+            // Default selected columns: ALL info by default
             const defaults = validKeys.filter(k => 
-                ['name', 'description', 'option1_name', 'option1_values', 'option2_name', 'option2_values', 'slug', 'rank_math_focus_keyword'].includes(k)
+                ['name', 'description', 'slug', 'rank_math_title', 'rank_math_description', 'rank_math_focus_keyword', 'option1_name', 'option1_values', 'option2_name', 'option2_values', 'option3_name', 'option3_values'].includes(k)
             );
             setSelectedColumns(defaults);
             
@@ -301,24 +302,14 @@ export default function App() {
 
                 // --- Context Injection based on Research Playbook ---
 
-                // 1. HTML Description: The "High-Conversion" Model
+                // 1. HTML Description: The "High-Conversion" Model (Heebo Template)
                 if (mode === 'HTML_CONTENT') {
-                     content = `CONTEXT: { Product: "${row.name}", CurrentKeyword: "${row.rank_math_focus_keyword || ''}" } SOURCE_CONTENT: ${content} \n\n MANDATORY STRUCTURE: 
-                     1. 🔥 Fire Bar (Value Prop) - Use <p> and <strong> tags.
-                     2. Hook (Problem/Solution) - Use <h2>.
-                     3. Benefits - Use <ul style="list-style: none; padding: 0;"> and <li>. Format: ✔ Feature — <strong>Benefit</strong> (NO Markdown **, NO DOTS).
-                     4. How It Works - Use <h3>. SIMPLE LANGUAGE. NO SCIENCE TALK.
-                     5. Specs Table - Use <table>.
-                     6. FAQ (3-5 Questions. NO NEGATIVITY. NO WARNINGS.) - Use <h3>.
-                     7. JSON-LD Schema (Product + AggregateRating) - Use <script> tag at the end. Randomly set ratingValue (4.7-4.9) and reviewCount (45-120).
-                     STYLE: Visual Hierarchy with HTML tags. Max 3 lines per paragraph.
-                     Length: 300+ Words.
-                     OUTPUT: RAW HTML string only.`;
+                     content = `CONTEXT: { Product: "${row.name}", CurrentKeyword: "${row.rank_math_focus_keyword || ''}" } SOURCE_CONTENT: ${content} \n\n MANDATORY: Generate High-End Designed HTML using the 'Heebo' template and Dynamic Color Palette defined in the System Instructions. STRICTLY NO MARKDOWN. Do NOT include "Kleerix" in text.`;
                 }
 
                 // 2. Slug: Hebrew Only
                 if (mode === 'SEO_SLUG') {
-                     content = `CONTEXT: { Product Name: "${row.name}", Keyword: "${row.rank_math_focus_keyword || ''}" } TASK: Generate Short HEBREW Slug (hyphenated). e.g. מוצר-שם-תכונה`;
+                     content = `CONTEXT: { Product Name: "${row.name}", Keyword: "${row.rank_math_focus_keyword || ''}" } TASK: Generate Short HEBREW Slug (hyphenated). e.g. מוצר-שם-תכונה. Do NOT include brand name.`;
                 }
                 
                 // 3. Focus Keyword: Commercial Intent Only (No Price)
@@ -329,7 +320,7 @@ export default function App() {
                 // 4. Short Description / Meta: CTR Focused
                 if (mode === 'SHORT_DESCRIPTION') {
                     if (!content || content.trim() === '') {
-                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${row.rank_math_focus_keyword || ''}" } TASK: Generate CTR-Focused Short Description (Benefit + CTA).`;
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${row.rank_math_focus_keyword || ''}" } TASK: Generate CTR-Focused Short Description (Benefit + CTA). Do NOT include "Kleerix".`;
                     }
                 }
 
@@ -340,15 +331,25 @@ export default function App() {
                     const keyword = row.rank_math_focus_keyword || 'AUTO_DETECT'; 
                     
                     if (isTitle) {
-                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate H1/Title. Formula: {Keyword} {Attribute} – {Brand}. Max 60 chars.`;
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate H1/Title. Formula: {Keyword} {Attribute}. CRITICAL: Title MUST start with the keyword. Do NOT include "Kleerix". Max 60 chars.`;
                     } else if (isDesc) {
-                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}", Desc: "${row.short_description || ''}" } TASK: Generate Meta Description. Formula: {Keyword} + {Benefit} + {USP} + {CTA}. Max 155 chars.`;
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}", Desc: "${row.short_description || ''}" } TASK: Generate Meta Description. Formula: {Keyword} + {Benefit} + {USP} + {CTA}. Do NOT include "Kleerix". Max 155 chars.`;
                     }
                 }
+
+                // 6. Professional Title (Product Name)
+                if (mode === 'PROFESSIONAL') {
+                     const keyword = row.rank_math_focus_keyword || '';
+                     if (keyword) {
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate Professional Product Title in Hebrew. CRITICAL: Title MUST start with the keyword "${keyword}". Formula: {Keyword} - {Main Feature}. Do NOT include "Kleerix".`;
+                     } else {
+                        content = `CONTEXT: { Product: "${row.name}" } TASK: Generate Professional Product Title in Hebrew. Formula: {Product Name} - {Main Feature}. Do NOT include "Kleerix".`;
+                     }
+                }
                 
-                // 6. Factual (Options/Values)
+                // 7. Factual (Options/Values)
                 if (mode === 'FACTUAL') {
-                    content = `TASK: Translate to Hebrew. Keep it simple and direct. For comma-separated lists, keep them comma-separated. Content: "${content}"`;
+                    content = `TASK: Translate to Hebrew. Keep it simple, direct and professional. For comma-separated lists, keep them comma-separated. Input: "${content}"`;
                 }
 
                 return { text: content, mode: mode, columnName: col };
@@ -608,7 +609,7 @@ export default function App() {
 
         {/* Top Navigation Bar */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
-            <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="w-full px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="bg-[#95bf47] p-2 rounded-lg shadow-lg shadow-lime-200">
                         <Sparkles className="text-white w-6 h-6" />
@@ -680,7 +681,7 @@ export default function App() {
         </header>
 
         {/* Main Workspace */}
-        <main className="flex-1 flex overflow-hidden max-w-[1600px] mx-auto w-full p-6 gap-6">
+        <main className="flex-1 flex overflow-hidden w-full p-6 gap-6">
             
             {/* Sidebar: Configuration */}
             <aside className="w-80 shrink-0 flex flex-col gap-6 overflow-y-auto custom-scrollbar pb-20">
@@ -783,7 +784,7 @@ export default function App() {
                                             <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSel ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
                                                 {isSel && <CheckSquare className="w-3 h-3 text-white" />}
                                             </div>
-                                            {col}
+                                            {COLUMN_LABELS_HE[col] || col}
                                         </button>
                                     </div>
                                     {isSel && (
@@ -823,9 +824,10 @@ export default function App() {
                             <tr>
                                 <th className="p-4 w-12"></th>
                                 <th className="p-4 w-20">תמונה</th>
-                                <th className="p-4">פרטי מוצר</th>
+                                <th className="p-4">זיהוי (ID)</th>
+                                <th className="p-4 w-24 text-center">ציון SEO</th>
                                 {selectedColumns.map(col => (
-                                    <th key={col} className="p-4 min-w-[200px] bg-slate-50">{col}</th>
+                                    <th key={col} className="p-4 min-w-[200px] bg-slate-50">{COLUMN_LABELS_HE[col] || col}</th>
                                 ))}
                                 <th className="p-4 w-28 text-center">פעולות</th>
                             </tr>
@@ -836,6 +838,8 @@ export default function App() {
                                 const dirty = isDirty(product.id);
                                 const syncState = syncStatus[product.id];
                                 const canRevert = JSON.stringify(product) !== JSON.stringify(immutableProducts[product.id]);
+                                
+                                const { score, issues } = calculateSeoScore(product);
 
                                 return (
                                     <tr key={product.id} className={`group hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-indigo-50/30' : ''}`}>
@@ -864,6 +868,31 @@ export default function App() {
                                             </div>
                                         </td>
                                         
+                                        <td className="p-4 align-top">
+                                            <div className="flex flex-col items-center gap-1 group/score relative">
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm border-4 cursor-help ${
+                                                    score >= 80 ? 'border-emerald-100 bg-emerald-50 text-emerald-700' :
+                                                    score >= 50 ? 'border-amber-100 bg-amber-50 text-amber-700' :
+                                                    'border-rose-100 bg-rose-50 text-rose-700'
+                                                }`}>
+                                                    {score}
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-400">Rank Math</span>
+                                                
+                                                {/* Issues Tooltip */}
+                                                {issues.length > 0 && (
+                                                    <div className="absolute top-14 z-50 w-64 p-3 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover/score:opacity-100 group-hover/score:visible transition-all text-right pointer-events-none">
+                                                        <div className="text-[10px] font-bold text-slate-400 mb-2 border-b pb-1">לשיפור (Missing):</div>
+                                                        <ul className="list-disc list-inside space-y-1">
+                                                            {issues.map((issue, idx) => (
+                                                                <li key={idx} className="text-[10px] text-slate-600 leading-tight">{issue}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+
                                         {selectedColumns.map(col => {
                                             const val = product[col] || '';
                                             const origVal = originalProducts[product.id]?.[col] || '';

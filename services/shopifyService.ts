@@ -18,68 +18,112 @@ const robustShopifyFetch = async (creds: ShopifyCredentials, query: string, vari
     const version = '2024-04'; // Stable version
     const endpoint = `https://${shop}/admin/api/${version}/graphql.json`;
 
-    // 3. Execution Wrapper
-    const execute = async (proxyUrl: string) => {
-        const res = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Shopify-Access-Token': cleanToken
-            },
-            body: JSON.stringify({ query, variables })
-        });
-
-        const txt = await res.text();
-
-        // Specific handling for Shopify's HTML 401 response vs JSON 401
-        if (res.status === 401) {
-             throw new Error(`Authentication Failed (401). Shopify rejected the token for ${shop}. Please ensure the token is valid for this specific shop.`);
-        }
+    // 3. Proxy Rotation Strategy
+    // We try multiple public proxies.
+    const proxies = [
+        // Priority 1: corsproxy.io (Best support for headers/POST)
+        (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
         
-        if (!res.ok) {
-             throw new Error(`HTTP Error ${res.status}: ${txt}`);
-        }
+        // Priority 2: CodeTabs (Often reliable)
+        (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
         
+        // Priority 3: ThingProxy (Backup)
+        (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+
+        // Priority 4: Direct (Works if user has "Allow CORS" extension installed)
+        (url: string) => url
+    ];
+
+    let lastError: Error | null = null;
+    let success = false;
+    let resultData: any = null;
+
+    for (const proxyGenerator of proxies) {
+        if (success) break;
+
+        const proxyUrl = proxyGenerator(endpoint);
         try {
-            const json = JSON.parse(txt);
+            console.log(`Attempting fetch via: ${proxyUrl.substring(0, 60)}...`);
             
-            // Top level errors (e.g. invalid query)
-            if (json.errors) {
-                const errorMsg = Array.isArray(json.errors) 
-                    ? json.errors.map((e:any) => e.message).join(' | ') 
-                    : JSON.stringify(json.errors);
-                throw new Error(`Shopify API Error: ${errorMsg}`);
-            }
-            
-            // Mutation userErrors
-            const mutationKeys = Object.keys(json.data || {});
-            for (const key of mutationKeys) {
-                if (json.data[key]?.userErrors?.length > 0) {
-                    const msgs = json.data[key].userErrors.map((e:any) => e.message).join(', ');
-                    throw new Error(`Mutation Error: ${msgs}`);
-                }
-            }
-            return json;
-        } catch (e: any) {
-            // Check if it's the specific "Invalid API key" HTML/Text response
-            if (txt.includes("Invalid API key")) {
-                 throw new Error("Shopify rejected the Access Token. Please verify it starts with 'shpat_'.");
-            }
-            throw new Error(`Invalid JSON Response: ${e.message}`);
-        }
-    };
+            const res = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Shopify-Access-Token': cleanToken
+                },
+                body: JSON.stringify({ query, variables })
+            });
 
-    // Retry Strategy: 
-    // We use corsproxy.io because it handles headers correctly.
-    // We encode the URL to be safe.
-    try {
-        const targetUrl = endpoint; 
-        return await execute(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-    } catch (error: any) {
-        console.warn("Primary proxy failed, trying backup...", error.message);
-        throw new Error(`Connection Failed. ${error.message}`);
+            const txt = await res.text();
+
+            // Special handling: If 401, it MIGHT be the proxy stripping headers.
+            if (res.status === 401) {
+                const isJson = txt.startsWith('{');
+                if (!isJson && txt.includes("Invalid API key")) {
+                    // Definitive Shopify rejection
+                    throw new Error("Shopify rejected the Access Token. Please verify credentials.");
+                }
+                // Generic 401 - likely proxy issue, try next
+                throw new Error(`Auth Failed (401) via proxy.`);
+            }
+
+            if (!res.ok) {
+                 // 429 is Rate Limit, 403/404 are other issues
+                 throw new Error(`HTTP Error ${res.status}: ${txt.substring(0, 200)}`);
+            }
+
+            try {
+                const json = JSON.parse(txt);
+                
+                // Top level errors
+                if (json.errors) {
+                    const errorMsg = Array.isArray(json.errors) 
+                        ? json.errors.map((e:any) => e.message).join(' | ') 
+                        : JSON.stringify(json.errors);
+                    throw new Error(`Shopify API Error: ${errorMsg}`);
+                }
+                
+                // Mutation userErrors
+                const mutationKeys = Object.keys(json.data || {});
+                for (const key of mutationKeys) {
+                    if (json.data[key]?.userErrors?.length > 0) {
+                        const msgs = json.data[key].userErrors.map((e:any) => e.message).join(', ');
+                        throw new Error(`Mutation Error: ${msgs}`);
+                    }
+                }
+                
+                resultData = json;
+                success = true;
+
+            } catch (e: any) {
+                if (txt.includes("Invalid API key")) {
+                     throw new Error("Shopify rejected the Access Token.");
+                }
+                // If HTML returned instead of JSON (common with some proxies on error pages)
+                if (txt.trim().startsWith('<')) {
+                    throw new Error("Proxy returned HTML instead of JSON. Service might be down.");
+                }
+                throw new Error(`Invalid JSON Response: ${e.message}`);
+            }
+
+        } catch (error: any) {
+            console.warn(`Connection attempt failed (${proxyUrl}): ${error.message}`);
+            lastError = error;
+            // Continue to next proxy
+        }
     }
+
+    if (!success) {
+        let msg = lastError?.message || "Connection failed.";
+        // Enhance message for common CORS/Network issues
+        if (msg.toLowerCase().includes("failed to fetch")) {
+            msg = "Network/CORS Error: The browser blocked the request. Please install a 'Allow CORS' Chrome Extension to use this tool directly from the browser.";
+        }
+        throw new Error(msg);
+    }
+
+    return resultData;
 };
 
 // --- Mappers ---
@@ -190,6 +234,12 @@ export const updateShopifyProduct = async (creds: ShopifyCredentials, productId:
         });
     }
 
+    // Determine Options Update
+    const optionsToUpdate: string[] = [];
+    if (data.option1_name) optionsToUpdate.push(data.option1_name);
+    if (data.option2_name) optionsToUpdate.push(data.option2_name);
+    if (data.option3_name) optionsToUpdate.push(data.option3_name);
+
     const variables = {
         input: {
             id: productId,
@@ -200,7 +250,9 @@ export const updateShopifyProduct = async (creds: ShopifyCredentials, productId:
                 title: data.rank_math_title,
                 description: data.rank_math_description || data.short_description
             },
-            metafields: metafields.length > 0 ? metafields : undefined
+            metafields: metafields.length > 0 ? metafields : undefined,
+            redirectNewHandle: true,
+            options: optionsToUpdate.length > 0 ? optionsToUpdate : undefined
         }
     };
 

@@ -32,6 +32,23 @@ export const MODE_LABELS: Record<OptimizationMode, string> = {
   'SEO_KEYWORD': 'Focus Keyword (מחקר מילות מפתח אוטומטי)'
 };
 
+// Friendly Hebrew Labels for Columns
+export const COLUMN_LABELS_HE: Record<string, string> = {
+  name: 'שם מוצר (Title)',
+  description: 'תיאור מלא (HTML Description)',
+  slug: 'כתובת URL (Slug)',
+  rank_math_focus_keyword: 'מילת מפתח (Focus Keyword)',
+  rank_math_title: 'כותרת SEO (Meta Title)',
+  rank_math_description: 'תיאור SEO (Meta Description)',
+  short_description: 'תיאור קצר (Excerpt)',
+  option1_name: 'שיוך 1 - שם (Option 1 Name)',
+  option1_values: 'שיוך 1 - ערכים (Option 1 Values)',
+  option2_name: 'שיוך 2 - שם',
+  option2_values: 'שיוך 2 - ערכים',
+  option3_name: 'שיוך 3 - שם',
+  option3_values: 'שיוך 3 - ערכים'
+};
+
 // Columns that are highly recommended for SEO optimization
 export const SEO_RECOMMENDED_PATTERNS = [
   "title", "name", "content", "description", "excerpt", "rank_math", "yoast", "seo", "keyword", "body", "slug", "url", "uri", "permalink", "תיאור", "שם", "כותרת", "short"

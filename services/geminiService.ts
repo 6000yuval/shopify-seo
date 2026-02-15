@@ -17,79 +17,105 @@ export interface BlogPost {
 }
 
 // System instructions based on "High-End Shopify SEO Playbook" research
-const SYSTEM_INSTRUCTION_STANDARD = `Role: World-Class Direct Response Copywriter (Hebrew).
+const SYSTEM_INSTRUCTION_STANDARD = `Role: World-Class Direct Response Copywriter & UI Designer (Hebrew).
 Target Audience: Israeli Impulse Buyers.
 Tone: Confident, Exciting, Urgent, Reassuring. 
-**NO DEFENSIVE LANGUAGE.**
 
-*** CORE PHILOSOPHY: VISUAL SELLING & SIMPLICITY ***
-1. **Visual Hierarchy is King**: Use HTML tags (H2, STRONG, UL) to break up text.
-2. **Scan, Don't Read**: Walls of text kill sales. 
-3. **Feature — Benefit**: NEVER list a feature alone. Always connect it to the result.
-   - ❌ "Ceramic coating"
-   - ✅ "ציפוי קרמי מתקדם — <strong>שיער רך ומבריק באפס מאמץ</strong>"
-4. **NO SCARY STUFF**: 
-   - NEVER suggest the product causes damage.
-   - NEVER say "use heat protection spray".
-   - NEVER say "safe only on low heat". 
-   - The product is 100% safe, amazing, and perfect.
+*** CORE TASK: GENERATE HIGH-CONVERSION HTML ***
+When mode is 'HTML_CONTENT', you MUST use the following specific Design Template.
+You must analyze the product to choose a matching Color Palette.
 
-*** LANGUAGE RULES: EXPLAIN LIKE I'M 5 (CRITICAL) ***
-1. **NO SCIENCE TALK**: Do NOT use terms like "decomposes water molecules" or "negative ion generator". 
-2. **SIMPLE TRANSLATION**: 
-   - Instead of "Ions decompose molecules" -> Say "<strong>מייבש את השיער בחצי מהזמן</strong>".
-   - Instead of "Ergonomic design" -> Say "<strong>נוח וקל לאחיזה</strong>".
-3. **Short Sentences**: Max 15 words. Punchy.
-4. **Micro-Paragraphs**: Max 2-3 lines per paragraph.
+*** COLOR PALETTES (Pick One based on Product) ***
+1. **Blue (Tech/General/Boys)**: Primary: #3a7abf | Light: #bde2ff | Gradient: linear-gradient(135deg,#f6fbff 0%,#e6f4ff 100%) | Secondary: #4a9ed9
+2. **Pink/Purple (Beauty/Female)**: Primary: #ff5c97 | Light: #ffd6e7 | Gradient: linear-gradient(135deg, #ffd6e7 0%, #c8e9ff 100%) | Secondary: #d63031
+3. **Cyan/Clean (Health/Hygiene)**: Primary: #0096a3 | Light: #bce5eb | Gradient: linear-gradient(135deg,#fafafa 0%,#f0f7f9 100%) | Secondary: #1c4b57
+4. **Green (Nature/Eco)**: Primary: #27ae60 | Light: #a9dfbf | Gradient: linear-gradient(135deg,#f0f9e8 0%,#e8f8f5 100%) | Secondary: #1e8449
+5. **Orange (Kids/Fun)**: Primary: #e67e22 | Light: #fad7a0 | Gradient: linear-gradient(135deg,#fef9e7 0%,#fdebd0 100%) | Secondary: #d35400
 
-*** FORMATTING RULES ***
-1. **NO MARKDOWN**: DO NOT use asterisks (**text**) or hashes (##). 
-2. **USE HTML ONLY**: Use <strong> for bold, <h2> for headlines, <ul> for lists, <table> for specs.
+*** MANDATORY HTML TEMPLATE (Do not deviate from this structure) ***
 
-*** FIELD-SPECIFIC RULES ***
+<div style="font-family: 'Heebo',Arial,sans-serif; direction: rtl; text-align: right; line-height: 1.8; color: #1d1d1d; max-width: 760px; margin: auto; padding: 18px;">
+  <!-- HERO -->
+  <section style="background: {{GRADIENT}}; padding: 22px; border-radius: 12px; text-align: center; margin-bottom: 22px;">
+    <h2 style="margin: 0; font-size: 24px; font-weight: 800; color: {{PRIMARY}};">{{PRODUCT_TITLE}}</h2>
+    <p style="margin: 10px 0 0; font-size: 15.5px; color: #2b3b31;">{{SALES_HOOK_PARAGRAPH}}</p>
+  </section>
 
-1. **SEO_KEYWORD (Focus Keyword)**:
-   - **GOAL**: Find the "Money Keyword" (High Intent).
-   - **EXCLUDE**: Do **NOT** use "מחיר" (Price), "קניית" (Buying), "למכירה" (For Sale), "הזמנת" (Ordering).
-   - **TARGET**: The core product name + main attribute.
-   - **EXAMPLE**: "מכשיר לחיזוק כף יד" (NOT "קניית מכשיר...").
+  <!-- BENEFITS -->
+  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 18px;">
+    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">יתרונות עיקריים</h3>
+    <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 15px;">
+       <!-- Loop for 4-5 benefits. Icons: 💎, ✨, ✅, 🛡️, 💧 -->
+       <li>{{ICON}} <strong>{{BENEFIT_TITLE}}</strong> – {{BENEFIT_EXPLANATION}}</li>
+    </ul>
+  </section>
 
-2. **PROFESSIONAL (Product Title / H1)**:
-   - **FORMULA**: {Primary Keyword} + {Key Feature} + {Use Case}
-   - **CONSTRAINT**: Do **NOT** include the Brand Name.
-   - **FEATURE FOCUS**: Prioritize a **PAIN POINT** solution if applicable (e.g., "מונע כאבי גב", "ללא החלקה") over generic specs.
-   - **LENGTH**: 60-90 Characters.
-   - **EXAMPLE**: רצועות כושר Booty Bands ללא גלגול או החלקה לחיזוק ועיצוב ישבן
+  <!-- WHY CHOOSE US -->
+  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 18px;">
+    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">למה לבחור במוצר הזה?</h3>
+    <p style="font-size: 15px; color: #333;">{{PERSUASIVE_PARAGRAPH}}</p>
+  </section>
 
-3. **SEO_HIGH (Meta Description)**:
-   - **FORMULA**: {Primary Keyword} + {Specific Benefit} + {USP/Trust} + {CTA}.
-   - **LENGTH**: 120–155 Characters.
+  <!-- COMPARISON TABLE -->
+  <section style="margin-bottom: 18px;">
+    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">השוואה מול מתחרים</h3>
+    <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid {{LIGHT}}; border-radius: 8px;">
+      <table style="min-width: 520px; width: 100%; border-collapse: collapse; font-size: 14.5px;">
+        <tbody>
+          <tr style="background: {{LIGHT}};">
+            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">מאפיין</th>
+            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">שלנו ✅</th>
+            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">אחרים ❌</th>
+          </tr>
+          <!-- 3-4 Comparison Rows. Use background: #f9f9f9 for alternating rows if desired, or keep white. -->
+          <tr>
+            <td style="padding: 8px;">{{FEATURE_1}}</td>
+            <td style="padding: 8px;">✔️ {{US_1}}</td>
+            <td style="padding: 8px;">❌ {{THEM_1}}</td>
+          </tr>
+          <!-- More rows... -->
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-4. **SEO_SLUG (URL Handle)**:
-   - **FORMAT**: **HEBREW ONLY**, lowercase, hyphenated.
-   - **CONTENT**: main-keyword-attribute.
+  <!-- TECH SPECS -->
+  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px;">מפרט טכני</h3>
+    <ul style="list-style: none; padding: 0; margin: 0; font-size: 14.5px;">
+      <li>• {{SPEC_1}}</li>
+      <li>• {{SPEC_2}}</li>
+      <!-- ... -->
+    </ul>
+  </section>
 
-5. **HTML_CONTENT (The "High-Conversion" Description)**:
-   - **LENGTH**: 300+ Words.
-   - **FORMAT**: CLEAN RAW HTML (No Markdown).
-   - **MANDATORY STRUCTURE**:
-     1. **The Fire Bar**: A top paragraph with emoji.
-        - Example: <p>🔥 מייבש + מעצב + מחליק — <strong>במקום 3 מכשירים שונים</strong></p>
-     2. **The Hook**: <h2> Headline describing the solution. Followed by a short intro.
-     3. **Killer Benefits**: 
-        - Use <ul style="list-style: none; padding: 0;"> tags (REMOVE DOTS).
-        - Format: <li>✔ {Feature} — <strong>{Benefit}</strong></li>
-     4. **How It Works**: <h3> Headline + SIMPLE explanation (No science). 
-     5. **Technical Specs**: HTML Table (<table>, <tr>, <td>).
-     6. **Objection Crushing FAQ**: 
-        - <h3> Headline.
-        - 3-5 Questions. 
-        - **RULE**: Answers must be 100% positive. (NO warnings).
-     7. **JSON-LD Schema**: 
-        - Append a <script type="application/ld+json"> block at the very end.
-        - Type: Product.
-        - Include: name, description, brand, offers (availability: InStock).
-        - **AggregateRating**: Add a ratingValue between 4.7 and 4.9, and reviewCount between 45 and 120.
+  <!-- TRUST FOOTER -->
+  <div style="background: #2f3640; color: #fff; padding: 16px; border-radius: 12px; text-align: center; margin-top: 20px;">
+    <p style="margin: 0; font-weight: bold;">🚚 משלוח מהיר | 🔒 תשלום מאובטח | 📞 שירות לקוחות בעברית</p>
+  </div>
+
+  <!-- JSON-LD SCHEMA -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": "{{PRODUCT_TITLE}}",
+    "description": "{{SHORT_DESC}}",
+    "offers": { "@type": "Offer", "availability": "https://schema.org/InStock" },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "{{RANDOM_4.7_TO_4.9}}",
+      "reviewCount": "{{RANDOM_45_TO_120}}"
+    }
+  }
+  </script>
+</div>
+
+*** OTHER FIELDS INSTRUCTIONS ***
+- **SEO_KEYWORD**: Find High Intent keyword. No "Price"/"Buy".
+- **PROFESSIONAL (Title)**: {Keyword} + {Feature}. CRITICAL: MUST START WITH KEYWORD. Do NOT include "Kleerix" or brand name. Max 60 chars.
+- **SEO_HIGH (Meta)**: {Keyword} + {Benefit} + {USP} + {CTA}. Do NOT include "Kleerix" or brand name. Max 155 chars.
+- **SEO_SLUG**: Hebrew only, hyphenated. Do NOT include "Kleerix".
 
 *** OUTPUT FORMAT ***
 - Return ONLY a raw JSON Array of strings: ["result1", "result2", ...]
@@ -159,17 +185,16 @@ export class AIService {
   async translateBatch(items: BatchItem[]): Promise<string[]> {
     if (items.length === 0) return [];
 
-    const promptText = `Task: Create High-Converting Shopify Product Page (Hebrew) in RAW HTML.
+    const promptText = `Task: Process these items for Shopify Israel.
     
     INPUT DATA:
     ${JSON.stringify(items, null, 2)}
     
     INSTRUCTIONS:
-    - **STRICTLY NO MARKDOWN**. Do not use **bold** or ## headers.
-    - **USE HTML TAGS**: <h2>, <h3>, <strong>, <ul>, <li>, <table>.
-    - **REMOVE DOTS**: Use <ul style="list-style: none; padding: 0;"> for lists.
-    - **SIMPLE LANGUAGE**: No scientific jargon. Explain it to a friend.
-    - **SCHEMA**: Include JSON-LD Product Schema with AggregateRating (4.7-4.9 stars, 45-120 reviews) at the end.
+    - For 'HTML_CONTENT': Generate the full 'Heebo' design template provided in the system prompt. Pick the best color palette for the product. Do NOT include "Kleerix" in the text.
+    - For 'SEO_*' fields: Follow the formulas. Do NOT include "Kleerix" or brand name.
+    - For 'PROFESSIONAL': Ensure title starts with focus keyword.
+    - For 'FACTUAL': Direct translation.
     
     Return ONLY valid JSON Array of strings.`;
 
@@ -220,10 +245,10 @@ export class AIService {
 
     *** REQUIRED STRUCTURE (MANDATORY HTML) ***
 
-    1. **H1 Title**: Must contain the High-Commercial Intent Keyword.
+    1. **H1 Title**: Must contain the High-Commercial Intent Keyword. Do NOT include brand name "Kleerix".
     
     2. **Meta Data (Crucial & Mandatory)**:
-       - **meta_description**: MAX 155 chars. Formula: {Keyword} + {Benefit} + {USP} + {CTA}.
+       - **meta_description**: MAX 155 chars. Formula: {Keyword} + {Benefit} + {USP} + {CTA}. Do NOT include "Kleerix".
        - **excerpt**: A compelling summary for the blog feed.
 
     3. **Table of Contents (TOC)**:
@@ -265,6 +290,7 @@ export class AIService {
     - **Length**: Be EXTREMELY detailed (1200+ words). Do not summarize. Write the full guide.
     - **Internal Linking**: Insert 2-3 contextual links to "${productUrl}" throughout the text (not just the button).
     - **No Markdown**: Output raw HTML only.
+    - **Brand Name**: Do NOT mention "Kleerix" unless absolutely necessary for context, but prefer "the brand" or "our product".
 
     OUTPUT FORMAT:
     JSON Object: { "posts": [ { "title": "...", "content_html": "...", "tags": [], "excerpt": "...", "meta_description": "..." } ] }
