@@ -58,7 +58,7 @@ export const calculateSeoScore = (row: ProductRow): SeoAnalysis => {
     
     // Keyword in Content intro (first 10%)
     const cleanContent = content.replace(/<[^>]*>/g, ' '); // Strip HTML
-    const first10Percent = cleanContent.substring(0, Math.ceil(cleanContent.length * 0.1));
+    const first10Percent = cleanContent.substring(0, Math.max(150, Math.ceil(cleanContent.length * 0.1)));
     if (first10Percent.includes(keyword)) {
         score += 15;
     } else {
@@ -74,7 +74,7 @@ export const calculateSeoScore = (row: ProductRow): SeoAnalysis => {
         issues.push("Content: Keyword missing in H2/H3/H4 subheadings.");
     }
     
-    // Keyword Density (Target 0.5% - 2.5%)
+    // Keyword Density (Target 0.5% - 3.5%) - Slightly wider range for Hebrew
     const words = cleanContent.split(/\s+/).filter(w => w.length > 0);
     const wordCount = words.length;
     // Simple count
@@ -82,12 +82,12 @@ export const calculateSeoScore = (row: ProductRow): SeoAnalysis => {
     
     if (wordCount > 0) {
         const density = (keywordCount / wordCount) * 100;
-        if (density >= 0.5 && density <= 2.5) {
+        if (density >= 0.5 && density <= 3.5) {
             score += 10;
         } else if (density > 0) {
-            score += 4;
-            if (density < 0.5) issues.push(`Density: Too low (${density.toFixed(1)}%). Target 0.5%-2.5%.`);
-            if (density > 2.5) issues.push(`Density: Too high (${density.toFixed(1)}%). Avoid stuffing.`);
+            score += 5; // Partial points if exists but off density
+            if (density < 0.5) issues.push(`Density: Too low (${density.toFixed(1)}%). Target 0.5%-3.5%.`);
+            if (density > 3.5) issues.push(`Density: Too high (${density.toFixed(1)}%). Avoid stuffing.`);
         } else {
             issues.push("Density: Keyword not found in content body.");
         }
@@ -96,20 +96,20 @@ export const calculateSeoScore = (row: ProductRow): SeoAnalysis => {
     }
 
     // URL Length (Short is better)
-    if (slug.length < 75) {
+    if (slug.length < 85) { // Increased slightly for Hebrew slugs
         score += 5;
     } else {
-        issues.push("URL: Too long (>75 chars).");
+        issues.push("URL: Too long (>85 chars).");
     }
 
-    // Content Length
-    if (wordCount > 250) {
+    // Content Length - Adjusted for Product Pages
+    if (wordCount > 200) {
         score += 5;
     } else {
-        issues.push(`Content: Too short (${wordCount} words). Target 250+.`);
+        issues.push(`Content: Too short (${wordCount} words). Target 200+.`);
     }
 
-    if (wordCount > 600) {
+    if (wordCount > 300) {
         score += 5; // Bonus
     }
 

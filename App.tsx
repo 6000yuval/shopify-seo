@@ -142,7 +142,7 @@ export default function App() {
             
             // Default selected columns: ALL info by default
             const defaults = validKeys.filter(k => 
-                ['name', 'description', 'slug', 'rank_math_title', 'rank_math_description', 'rank_math_focus_keyword', 'option1_name', 'option1_values', 'option2_name', 'option2_values', 'option3_name', 'option3_values'].includes(k)
+                ['name', 'description', 'slug', 'rank_math_title', 'rank_math_description', 'rank_math_focus_keyword', 'selling_bullets', 'option1_name', 'option1_values', 'option2_name', 'option2_values', 'option3_name', 'option3_values'].includes(k)
             );
             setSelectedColumns(defaults);
             
@@ -154,7 +154,7 @@ export default function App() {
 
         setIsConnected(true);
     } catch (err: any) {
-        setError("Shopify Connection Failed: " + err.message);
+        setError(err.message);
     } finally {
         setIsShopifyLoading(false);
     }
@@ -239,6 +239,8 @@ export default function App() {
   const detectDefaultMode = (colName: string): OptimizationMode => {
     const c = colName.toLowerCase();
     
+    if (c.includes('selling') || c.includes('bullets')) return 'SELLING_BULLETS';
+
     // Exact Matches for Options
     if (c.includes('option') || c.includes('value') || c.includes('שיוך')) return 'FACTUAL';
 
@@ -314,7 +316,7 @@ export default function App() {
                 
                 // 3. Focus Keyword: Commercial Intent Only (No Price)
                 if (mode === 'SEO_KEYWORD') {
-                    content = `CONTEXT: { Product: "${row.name}", Desc: "${row.short_description || ''}" } TASK: Generate 1 High Intent Commercial Keyword. Do NOT use the word "מחיר" (Price).`;
+                    content = `CONTEXT: { Product: "${row.name}", Desc: "${row.short_description || ''}" } TASK: Generate 1 High Intent, Specific Commercial Keyword (3-4 words). Example: "מכשיר לחיזוק כף היד" (with 'ל'). Avoid generic terms. Do NOT use "מחיר" or "Buy".`;
                 }
 
                 // 4. Short Description / Meta: CTR Focused
@@ -331,7 +333,7 @@ export default function App() {
                     const keyword = row.rank_math_focus_keyword || 'AUTO_DETECT'; 
                     
                     if (isTitle) {
-                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate H1/Title. Formula: {Keyword} {Attribute}. CRITICAL: Title MUST start with the keyword. Do NOT include "Kleerix". Max 60 chars.`;
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate H1/Title. CRITICAL: The Title MUST start with the exact keyword phrase "${keyword}" character-for-character. Do NOT remove prepositions (like 'ל' or 'ב'). Formula: {Exact Keyword} - {Feature}. Max 60 chars.`;
                     } else if (isDesc) {
                         content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}", Desc: "${row.short_description || ''}" } TASK: Generate Meta Description. Formula: {Keyword} + {Benefit} + {USP} + {CTA}. Do NOT include "Kleerix". Max 155 chars.`;
                     }
@@ -341,15 +343,29 @@ export default function App() {
                 if (mode === 'PROFESSIONAL') {
                      const keyword = row.rank_math_focus_keyword || '';
                      if (keyword) {
-                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate Professional Product Title in Hebrew. CRITICAL: Title MUST start with the keyword "${keyword}". Formula: {Keyword} - {Main Feature}. Do NOT include "Kleerix".`;
+                        content = `CONTEXT: { Product: "${row.name}", Keyword: "${keyword}" } TASK: Generate Professional Product Title in Hebrew. 
+                        CRITICAL RULE: The title MUST begin with the EXACT keyword phrase "${keyword}". 
+                        Verbatim check: If keyword is "מכשיר לחיזוק", title MUST start with "מכשיר לחיזוק". It CANNOT be "מכשיר חיזוק". 
+                        Do NOT drop the letter 'ל' or 'ב' or 'ה'. Copy-paste the keyword exactly.`;
                      } else {
                         content = `CONTEXT: { Product: "${row.name}" } TASK: Generate Professional Product Title in Hebrew. Formula: {Product Name} - {Main Feature}. Do NOT include "Kleerix".`;
                      }
                 }
+
+                // 7. Selling Bullets (New)
+                if (mode === 'SELLING_BULLETS') {
+                    content = `CONTEXT: { Product: "${row.name}", Keyword: "${row.rank_math_focus_keyword || ''}" } TASK: Write 5 short, punchy selling bullets (benefits) in Hebrew. Format: Plain text with bullets (•), one per line. Max 4 words per bullet. Focus on: Relief, Comfort, Innovation. Example:\n• הקלה מיידית בכאב\n• נוחות מקסימלית לכל היום`;
+                }
                 
-                // 7. Factual (Options/Values)
+                // 8. Factual (Options/Values) - UPDATED FOR HEBREW TRANSLATION
                 if (mode === 'FACTUAL') {
-                    content = `TASK: Translate to Hebrew. Keep it simple, direct and professional. For comma-separated lists, keep them comma-separated. Input: "${content}"`;
+                    if (col.startsWith('option') || col.includes('name') || col.includes('value')) {
+                         content = `TASK: Translate these Product Option Names/Values to Hebrew. Examples: 'Small'->'קטן', 'Blue'->'כחול', 'Size'->'מידה', 'Color'->'צבע'. Maintain comma separation strictly. Input: "${content}"`;
+                    } else if (col.includes('שיוך')) {
+                         content = `TASK: Translate these Product Option Names/Values to Hebrew. Input: "${content}"`;
+                    } else {
+                         content = `TASK: Translate to Hebrew. Preserve numbers. Input: "${content}"`;
+                    }
                 }
 
                 return { text: content, mode: mode, columnName: col };
@@ -592,7 +608,25 @@ export default function App() {
                         <input type="password" placeholder="shpat_..." value={shopifyCreds.token} onChange={e=>setShopifyCreds(p=>({...p, token: e.target.value}))} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500" dir="ltr" />
                     </div>
                     
-                    {error && <div className="text-rose-500 text-sm font-bold bg-rose-50 p-3 rounded-lg">{error}</div>}
+                    {error && (
+                        <div className="text-rose-600 text-sm font-bold bg-rose-50 p-4 rounded-xl border border-rose-200 whitespace-pre-wrap">
+                            {error.includes("ACTIVATION_REQUIRED") ? (
+                                <div className="flex flex-col gap-2 items-center text-center">
+                                    <span className="text-lg">🛑 נדרשת פעולה חד-פעמית</span>
+                                    <span>הדפדפן חוסם את הגישה. כדי לעקוף זאת:</span>
+                                    <a 
+                                        href={error.split('https')[1] ? `https${error.split('https')[1]}` : "https://cors-anywhere.herokuapp.com/corsdemo"}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-rose-600 text-white px-4 py-2 rounded-lg font-black hover:bg-rose-700 transition-all shadow-lg"
+                                    >
+                                        לחץ כאן לשחרור החסימה
+                                    </a>
+                                    <span className="text-xs text-rose-500 mt-1">לאחר הלחיצה ואישור בדף שנפתח, חזור לכאן ולחץ "התחבר לחנות" שוב.</span>
+                                </div>
+                            ) : error}
+                        </div>
+                    )}
 
                     <button type="submit" disabled={isShopifyLoading} className="w-full bg-[#95bf47] text-white py-4 rounded-xl font-black text-lg hover:bg-[#85ab3f] transition-all flex justify-center gap-2 shadow-lg shadow-lime-200">
                         {isShopifyLoading ? <Loader2 className="animate-spin" /> : 'התחבר לחנות'}
@@ -900,7 +934,7 @@ export default function App() {
                                             
                                             return (
                                                 <td key={col} className={`p-4 align-top max-w-xs ${isChanged ? 'bg-amber-50/50' : ''}`}>
-                                                    <div className="line-clamp-3 text-slate-600 leading-relaxed text-xs">
+                                                    <div className="line-clamp-3 text-slate-600 leading-relaxed text-xs whitespace-pre-line">
                                                         {val}
                                                     </div>
                                                     {isChanged && <div className="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><Sparkles className="w-3 h-3"/> שונה ע"י AI</div>}

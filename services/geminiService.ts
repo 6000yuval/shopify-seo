@@ -34,44 +34,44 @@ You must analyze the product to choose a matching Color Palette.
 
 *** MANDATORY HTML TEMPLATE (Do not deviate from this structure) ***
 
-<div style="font-family: 'Heebo',Arial,sans-serif; direction: rtl; text-align: right; line-height: 1.8; color: #1d1d1d; max-width: 760px; margin: auto; padding: 18px;">
+<div style="font-family: 'Heebo',Arial,sans-serif; direction: rtl; text-align: right; line-height: 1.6; color: #1d1d1d; max-width: 100%; margin: auto; padding: 12px;">
   <!-- HERO -->
-  <section style="background: {{GRADIENT}}; padding: 22px; border-radius: 12px; text-align: center; margin-bottom: 22px;">
-    <h2 style="margin: 0; font-size: 24px; font-weight: 800; color: {{PRIMARY}};">{{PRODUCT_TITLE}}</h2>
-    <p style="margin: 10px 0 0; font-size: 15.5px; color: #2b3b31;">{{SALES_HOOK_PARAGRAPH}}</p>
+  <section style="background: {{GRADIENT}}; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+    <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: {{PRIMARY}};">{{PRODUCT_TITLE}}</h2>
+    <p style="margin: 10px 0 0; font-size: 15px; color: #2b3b31;">{{SALES_HOOK_PARAGRAPH}}</p>
   </section>
 
   <!-- BENEFITS -->
-  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 18px;">
-    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">יתרונות עיקריים</h3>
-    <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 15px;">
+  <section style="background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 15px;">
+    <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">יתרונות עיקריים של {{KEYWORD_OR_PRODUCT}}</h3>
+    <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: 15px;">
        <!-- Loop for 4-5 benefits. Icons: 💎, ✨, ✅, 🛡️, 💧 -->
        <li>{{ICON}} <strong>{{BENEFIT_TITLE}}</strong> – {{BENEFIT_EXPLANATION}}</li>
     </ul>
   </section>
 
   <!-- WHY CHOOSE US -->
-  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 18px;">
+  <section style="background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 15px;">
     <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">למה לבחור במוצר הזה?</h3>
     <p style="font-size: 15px; color: #333;">{{PERSUASIVE_PARAGRAPH}}</p>
   </section>
 
-  <!-- COMPARISON TABLE -->
-  <section style="margin-bottom: 18px;">
+  <!-- COMPARISON TABLE (MOBILE OPTIMIZED - NO SCROLL) -->
+  <section style="margin-bottom: 15px;">
     <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px; border-bottom: 2px solid {{LIGHT}}; padding-bottom: 6px;">השוואה מול מתחרים</h3>
-    <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid {{LIGHT}}; border-radius: 8px;">
-      <table style="min-width: 520px; width: 100%; border-collapse: collapse; font-size: 14.5px;">
+    <div style="border: 1px solid {{LIGHT}}; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed;">
         <tbody>
           <tr style="background: {{LIGHT}};">
-            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">מאפיין</th>
-            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">שלנו ✅</th>
-            <th style="padding: 8px; border-bottom: 1px solid {{LIGHT}};">אחרים ❌</th>
+            <th style="padding: 8px 4px; border-bottom: 1px solid {{LIGHT}}; width: 38%; vertical-align: middle;">מאפיין</th>
+            <th style="padding: 8px 4px; border-bottom: 1px solid {{LIGHT}}; width: 31%; vertical-align: middle;">שלנו ✅</th>
+            <th style="padding: 8px 4px; border-bottom: 1px solid {{LIGHT}}; width: 31%; vertical-align: middle;">אחרים ❌</th>
           </tr>
-          <!-- 3-4 Comparison Rows. Use background: #f9f9f9 for alternating rows if desired, or keep white. -->
+          <!-- 3-4 Comparison Rows -->
           <tr>
-            <td style="padding: 8px;">{{FEATURE_1}}</td>
-            <td style="padding: 8px;">✔️ {{US_1}}</td>
-            <td style="padding: 8px;">❌ {{THEM_1}}</td>
+            <td style="padding: 8px 4px; border-bottom: 1px solid #f0f0f0; word-wrap: break-word;">{{FEATURE_1}}</td>
+            <td style="padding: 8px 4px; border-bottom: 1px solid #f0f0f0; word-wrap: break-word; font-weight: bold;">✔️ {{US_1}}</td>
+            <td style="padding: 8px 4px; border-bottom: 1px solid #f0f0f0; opacity: 0.7; word-wrap: break-word;">❌ {{THEM_1}}</td>
           </tr>
           <!-- More rows... -->
         </tbody>
@@ -80,19 +80,14 @@ You must analyze the product to choose a matching Color Palette.
   </section>
 
   <!-- TECH SPECS -->
-  <section style="background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+  <section style="background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
     <h3 style="margin: 0 0 10px; color: {{PRIMARY}}; font-size: 18px;">מפרט טכני</h3>
-    <ul style="list-style: none; padding: 0; margin: 0; font-size: 14.5px;">
+    <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px;">
       <li>• {{SPEC_1}}</li>
       <li>• {{SPEC_2}}</li>
       <!-- ... -->
     </ul>
   </section>
-
-  <!-- TRUST FOOTER -->
-  <div style="background: #2f3640; color: #fff; padding: 16px; border-radius: 12px; text-align: center; margin-top: 20px;">
-    <p style="margin: 0; font-weight: bold;">🚚 משלוח מהיר | 🔒 תשלום מאובטח | 📞 שירות לקוחות בעברית</p>
-  </div>
 
   <!-- JSON-LD SCHEMA -->
   <script type="application/ld+json">
@@ -110,6 +105,19 @@ You must analyze the product to choose a matching Color Palette.
   }
   </script>
 </div>
+
+*** SEO MANDATES (CRITICAL FOR SCORE 100/100) ***
+If a "CurrentKeyword" is provided in the input context, you MUST:
+1. Start the {{PRODUCT_TITLE}} (H2) with this exact keyword phrase, character-for-character. Do NOT remove prepositions (like 'ל' or 'ב').
+2. Include the exact keyword in the first sentence of {{SALES_HOOK_PARAGRAPH}}.
+3. Include the exact keyword in the H3 subheading for Benefits (e.g., "Main benefits of [Keyword]").
+4. Repeat the keyword naturally 3-4 times throughout the body text (Density).
+5. Make sure the paragraphs are detailed enough to reach approx 300 words total.
+
+*** NEGATIVE CONSTRAINTS (STRICT) ***
+- **Do NOT add any footer text** like "Fast Shipping", "Secure Payment", "Customer Service" or "משלוח מהיר".
+- **Do NOT add icons line** like "🚚 | 🔒 | 📞".
+- **Do NOT mention "Kleerix"** unless in a very subtle way or if instructed.
 
 *** OTHER FIELDS INSTRUCTIONS ***
 - **SEO_KEYWORD**: Find High Intent keyword. No "Price"/"Buy".
@@ -150,36 +158,80 @@ export class AIService {
   }
 
   private extractValidJson(text: string): string {
-    // Remove markdown code blocks and whitespace
+    // 1. Remove markdown code blocks and whitespace
     let clean = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    
-    // Find the outer bounds of JSON (Object or Array)
+
+    // 2. Identify start character and type
     const firstBrace = clean.indexOf('{');
     const firstBracket = clean.indexOf('[');
-    
-    let start = -1;
-    let end = -1;
-    
-    // Check if it starts as an Object or Array
+
+    let startIndex = -1;
+    let openChar = '';
+    let closeChar = '';
+
     if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-        start = firstBrace;
-        end = clean.lastIndexOf('}');
+        startIndex = firstBrace;
+        openChar = '{';
+        closeChar = '}';
     } else if (firstBracket !== -1) {
-        start = firstBracket;
-        end = clean.lastIndexOf(']');
+        startIndex = firstBracket;
+        openChar = '[';
+        closeChar = ']';
+    } else {
+        // Fallback if no valid JSON start found
+        return "{}";
     }
 
-    // Extract the substring if bounds found
-    if (start !== -1 && end !== -1 && end > start) {
-        clean = clean.substring(start, end + 1);
-    } else {
-        // Fallback: if no brackets found but text exists, wrap in brackets (rare edge case for single strings)
-        if (clean.length > 0 && !clean.startsWith('{') && !clean.startsWith('[')) {
-             return "{}"; // Safe fail
+    // 3. Balance Brackets to find the true end
+    // This handles cases where AI outputs infinite trailing ']' or '}'
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+    let endIndex = -1;
+
+    for (let i = startIndex; i < clean.length; i++) {
+        const char = clean[i];
+
+        if (isEscaped) {
+            isEscaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            isEscaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (!inString) {
+            if (char === openChar) {
+                depth++;
+            } else if (char === closeChar) {
+                depth--;
+                if (depth === 0) {
+                    endIndex = i;
+                    break;
+                }
+            }
         }
     }
+
+    if (endIndex !== -1) {
+        return clean.substring(startIndex, endIndex + 1);
+    }
     
-    return clean;
+    // 4. Fallback: If balancing failed (e.g. truncated), try simple lastIndexOf
+    // Note: This might still capture garbage if the AI hallucinates, but it's a backup.
+    const fallbackEnd = clean.lastIndexOf(closeChar);
+    if (fallbackEnd > startIndex) {
+        return clean.substring(startIndex, fallbackEnd + 1);
+    }
+
+    return "{}";
   }
 
   async translateBatch(items: BatchItem[]): Promise<string[]> {

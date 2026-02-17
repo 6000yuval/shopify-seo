@@ -1,171 +1,109 @@
 
 export interface ShopifyCredentials {
-  shop: string; // e.g. "my-store.myshopify.com"
-  token: string; // Admin API Access Token (shpat_...)
+  shop: string;
+  token: string;
 }
 
-// --- Internal Helper for Robust Fetching ---
+// ===============================
+// CLOUD RUN PROXY CONFIG
+// ===============================
 
-const robustShopifyFetch = async (creds: ShopifyCredentials, query: string, variables?: any) => {
-    // 1. Sanitize Shop URL
-    let shop = creds.shop.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
-    if (!shop.includes('myshopify.com') && !shop.includes('.')) {
-        shop += '.myshopify.com';
-    }
+const PROXY_URL = "https://shopify-proxy-1021730791396.us-west1.run.app/graphql";
+const PROXY_KEY = "abc123"; // change if you updated it in Cloud Run
 
-    // 2. Token & Endpoint
-    const cleanToken = creds.token.trim();
-    const version = '2024-04'; // Stable version
-    const endpoint = `https://${shop}/admin/api/${version}/graphql.json`;
+// ===============================
+// ROBUST FETCH (VIA CLOUD RUN)
+// ===============================
 
-    // 3. Proxy Rotation Strategy
-    // We try multiple public proxies.
-    const proxies = [
-        // Priority 1: corsproxy.io (Best support for headers/POST)
-        (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        
-        // Priority 2: CodeTabs (Often reliable)
-        (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-        
-        // Priority 3: ThingProxy (Backup)
-        (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+const robustShopifyFetch = async (_creds: ShopifyCredentials, query: string, variables?: any) => {
+  const res = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Proxy-Key": PROXY_KEY
+    },
+    body: JSON.stringify({
+      apiVersion: "2024-04",
+      query,
+      variables
+    })
+  });
 
-        // Priority 4: Direct (Works if user has "Allow CORS" extension installed)
-        (url: string) => url
-    ];
+  const json = await res.json();
 
-    let lastError: Error | null = null;
-    let success = false;
-    let resultData: any = null;
+  if (!res.ok) {
+    throw new Error(`Proxy HTTP ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
+  }
 
-    for (const proxyGenerator of proxies) {
-        if (success) break;
+  if (json.errors) {
+    const msg = Array.isArray(json.errors)
+      ? json.errors.map((e:any) => e.message).join(" | ")
+      : String(json.errors);
+    throw new Error(`Shopify API Error: ${msg}`);
+  }
 
-        const proxyUrl = proxyGenerator(endpoint);
-        try {
-            console.log(`Attempting fetch via: ${proxyUrl.substring(0, 60)}...`);
-            
-            const res = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-Shopify-Access-Token': cleanToken
-                },
-                body: JSON.stringify({ query, variables })
-            });
-
-            const txt = await res.text();
-
-            // Special handling: If 401, it MIGHT be the proxy stripping headers.
-            if (res.status === 401) {
-                const isJson = txt.startsWith('{');
-                if (!isJson && txt.includes("Invalid API key")) {
-                    // Definitive Shopify rejection
-                    throw new Error("Shopify rejected the Access Token. Please verify credentials.");
-                }
-                // Generic 401 - likely proxy issue, try next
-                throw new Error(`Auth Failed (401) via proxy.`);
-            }
-
-            if (!res.ok) {
-                 // 429 is Rate Limit, 403/404 are other issues
-                 throw new Error(`HTTP Error ${res.status}: ${txt.substring(0, 200)}`);
-            }
-
-            try {
-                const json = JSON.parse(txt);
-                
-                // Top level errors
-                if (json.errors) {
-                    const errorMsg = Array.isArray(json.errors) 
-                        ? json.errors.map((e:any) => e.message).join(' | ') 
-                        : JSON.stringify(json.errors);
-                    throw new Error(`Shopify API Error: ${errorMsg}`);
-                }
-                
-                // Mutation userErrors
-                const mutationKeys = Object.keys(json.data || {});
-                for (const key of mutationKeys) {
-                    if (json.data[key]?.userErrors?.length > 0) {
-                        const msgs = json.data[key].userErrors.map((e:any) => e.message).join(', ');
-                        throw new Error(`Mutation Error: ${msgs}`);
-                    }
-                }
-                
-                resultData = json;
-                success = true;
-
-            } catch (e: any) {
-                if (txt.includes("Invalid API key")) {
-                     throw new Error("Shopify rejected the Access Token.");
-                }
-                // If HTML returned instead of JSON (common with some proxies on error pages)
-                if (txt.trim().startsWith('<')) {
-                    throw new Error("Proxy returned HTML instead of JSON. Service might be down.");
-                }
-                throw new Error(`Invalid JSON Response: ${e.message}`);
-            }
-
-        } catch (error: any) {
-            console.warn(`Connection attempt failed (${proxyUrl}): ${error.message}`);
-            lastError = error;
-            // Continue to next proxy
-        }
-    }
-
-    if (!success) {
-        let msg = lastError?.message || "Connection failed.";
-        // Enhance message for common CORS/Network issues
-        if (msg.toLowerCase().includes("failed to fetch")) {
-            msg = "Network/CORS Error: The browser blocked the request. Please install a 'Allow CORS' Chrome Extension to use this tool directly from the browser.";
-        }
-        throw new Error(msg);
-    }
-
-    return resultData;
+  return json;
 };
 
-// --- Mappers ---
+// ===============================
+// MAPPERS
+// ===============================
 
 const mapShopifyProduct = (node: any) => {
-    const seo = node.seo || {};
-    const keywordMeta = node.metafields?.edges?.find((e: any) => e.node.key === 'focus_keyword' || e.node.key === 'seo_keywords');
-    const keyword = keywordMeta ? keywordMeta.node.value : '';
+  const seo = node.seo || {};
+  
+  // Find Metafields
+  const keywordMeta = node.metafields?.edges?.find(
+    (e: any) => e.node.key === "focus_keyword" || e.node.key === "seo_keywords"
+  );
+  const bulletsMeta = node.metafields?.edges?.find(
+    (e: any) => e.node.key === "selling_bullets_a"
+  );
 
-    // Map Options
-    const options = node.options || [];
-    const option1 = options[0];
-    const option2 = options[1];
-    const option3 = options[2];
+  const keyword = keywordMeta ? keywordMeta.node.value : "";
+  const bullets = bulletsMeta ? bulletsMeta.node.value : "";
 
-    return {
-        id: node.id,
-        name: node.title,
-        status: node.status.toLowerCase(),
-        slug: node.handle,
-        description: node.descriptionHtml || '',
-        short_description: seo.description || '', 
-        sku: node.variants?.edges?.[0]?.node?.sku || '',
-        image: node.featuredImage?.url || '',
-        rank_math_title: seo.title || '',
-        rank_math_description: seo.description || '',
-        rank_math_focus_keyword: keyword,
-        permalink: node.onlineStoreUrl || '',
-        
-        // Option Columns for Translation
-        option1_name: option1 ? option1.name : '',
-        option1_values: option1 ? option1.values.join(', ') : '',
-        option2_name: option2 ? option2.name : '',
-        option2_values: option2 ? option2.values.join(', ') : '',
-        option3_name: option3 ? option3.name : '',
-        option3_values: option3 ? option3.values.join(', ') : ''
-    };
+  const options = node.options || [];
+  const option1 = options[0];
+  const option2 = options[1];
+  const option3 = options[2];
+
+  return {
+    id: node.id,
+    name: node.title,
+    status: node.status.toLowerCase(),
+    slug: node.handle,
+    description: node.descriptionHtml || "",
+    short_description: seo.description || "",
+    sku: node.variants?.edges?.[0]?.node?.sku || "",
+    image: node.featuredImage?.url || "",
+    rank_math_title: seo.title || "",
+    rank_math_description: seo.description || "",
+    rank_math_focus_keyword: keyword,
+    selling_bullets: bullets, // New mapped field
+    permalink: node.onlineStoreUrl || "",
+    
+    // Map Option Names & Values
+    // Note: We store IDs to allow updating names later
+    option1_id: option1 ? option1.id : "",
+    option1_name: option1 ? option1.name : "",
+    option1_values: option1 ? option1.values.join(", ") : "",
+    
+    option2_id: option2 ? option2.id : "",
+    option2_name: option2 ? option2.name : "",
+    option2_values: option2 ? option2.values.join(", ") : "",
+    
+    option3_id: option3 ? option3.id : "",
+    option3_name: option3 ? option3.name : "",
+    option3_values: option3 ? option3.values.join(", ") : ""
+  };
 };
 
-// --- Exports ---
+// ===============================
+// EXPORTS
+// ===============================
 
-export const fetchShopifyProducts = async (creds: ShopifyCredentials): Promise<any[]> => {
+export const fetchShopifyProducts = async (_creds: ShopifyCredentials): Promise<any[]> => {
   const query = `
     {
       products(first: 50) {
@@ -182,6 +120,7 @@ export const fetchShopifyProducts = async (creds: ShopifyCredentials): Promise<a
               edges { node { sku } }
             }
             options {
+              id
               name
               values
             }
@@ -189,7 +128,7 @@ export const fetchShopifyProducts = async (creds: ShopifyCredentials): Promise<a
               title
               description
             }
-            metafields(first: 10, namespace: "custom") {
+            metafields(first: 20, namespace: "custom") {
               edges {
                 node {
                   key
@@ -204,64 +143,110 @@ export const fetchShopifyProducts = async (creds: ShopifyCredentials): Promise<a
     }
   `;
 
-  const data = await robustShopifyFetch(creds, query);
+  const data = await robustShopifyFetch(_creds, query);
   return data.data.products.edges.map((e: any) => mapShopifyProduct(e.node));
 };
 
-export const updateShopifyProduct = async (creds: ShopifyCredentials, productId: string, data: any): Promise<boolean> => {
-    const mutation = `
-      mutation productUpdate($input: ProductInput!) {
-        productUpdate(input: $input) {
-          product {
-            id
-            title
-          }
-          userErrors {
-            field
-            message
-          }
+export const updateShopifyProduct = async (
+  _creds: ShopifyCredentials,
+  productId: string,
+  data: any
+): Promise<boolean> => {
+  // 1. Update Main Product Fields (Title, Desc, Handle, SEO, Metafields)
+  const productMutation = `
+    mutation productUpdate($input: ProductInput!) {
+      productUpdate(input: $input) {
+        product {
+          id
+          title
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `;
-
-    const metafields = [];
-    if (data.rank_math_focus_keyword) {
-        metafields.push({
-            namespace: "custom",
-            key: "focus_keyword",
-            value: data.rank_math_focus_keyword,
-            type: "single_line_text_field"
-        });
     }
+  `;
 
-    // Determine Options Update
-    const optionsToUpdate: string[] = [];
-    if (data.option1_name) optionsToUpdate.push(data.option1_name);
-    if (data.option2_name) optionsToUpdate.push(data.option2_name);
-    if (data.option3_name) optionsToUpdate.push(data.option3_name);
+  const metafields = [];
+  
+  // SEO Keyword
+  if (data.rank_math_focus_keyword) {
+    metafields.push({
+      namespace: "custom",
+      key: "focus_keyword",
+      value: data.rank_math_focus_keyword,
+      type: "single_line_text_field"
+    });
+  }
 
-    const variables = {
-        input: {
-            id: productId,
-            title: data.name,
-            descriptionHtml: data.description,
-            handle: data.slug,
-            seo: {
-                title: data.rank_math_title,
-                description: data.rank_math_description || data.short_description
-            },
-            metafields: metafields.length > 0 ? metafields : undefined,
-            redirectNewHandle: true,
-            options: optionsToUpdate.length > 0 ? optionsToUpdate : undefined
+  // Selling Bullets
+  if (data.selling_bullets) {
+    // We treat it as multi_line_text_field (string with newlines)
+    // If your theme expects a list, this might need to be "list.single_line_text_field" and value as JSON string array.
+    // Based on common practices for "bullets text block", multi_line is safest default.
+    metafields.push({
+      namespace: "custom",
+      key: "selling_bullets_a",
+      value: data.selling_bullets,
+      type: "multi_line_text_field"
+    });
+  }
+
+  const variables = {
+    input: {
+      id: productId,
+      title: data.name,
+      descriptionHtml: data.description,
+      handle: data.slug,
+      seo: {
+        title: data.rank_math_title,
+        description: data.rank_math_description || data.short_description
+      },
+      metafields: metafields.length > 0 ? metafields : undefined,
+      redirectNewHandle: true
+      // options: [] -- REMOVED: Cannot pass options here in this API version
+    }
+  };
+
+  await robustShopifyFetch(_creds, productMutation, variables);
+
+  // 2. Update Option Names (if IDs are present)
+  // We do this via separate mutations because productUpdate doesn't support renaming options directly via list
+  const optionMutation = `
+    mutation productOptionUpdate($productId: ID!, $optionId: ID!, $name: String!) {
+      productOptionUpdate(productId: $productId, optionId: $optionId, name: $name) {
+        userErrors {
+          field
+          message
         }
-    };
+      }
+    }
+  `;
 
-    await robustShopifyFetch(creds, mutation, variables);
-    return true;
+  // Helper to update one option
+  const updateOptionName = async (optId: string, newName: string) => {
+    if (!optId || !newName) return;
+    try {
+        await robustShopifyFetch(_creds, optionMutation, {
+            productId: productId,
+            optionId: optId,
+            name: newName
+        });
+    } catch (e) {
+        console.warn(`Failed to update option ${optId} name to ${newName}`, e);
+    }
+  };
+
+  if (data.option1_id && data.option1_name) await updateOptionName(data.option1_id, data.option1_name);
+  if (data.option2_id && data.option2_name) await updateOptionName(data.option2_id, data.option2_name);
+  if (data.option3_id && data.option3_name) await updateOptionName(data.option3_id, data.option3_name);
+
+  return true;
 };
 
-export const fetchShopifyBlogs = async (creds: ShopifyCredentials): Promise<{id: string, title: string, handle: string}[]> => {
-    const query = `
+export const fetchShopifyBlogs = async (_creds: ShopifyCredentials) => {
+  const query = `
     {
       blogs(first: 20) {
         edges {
@@ -273,77 +258,70 @@ export const fetchShopifyBlogs = async (creds: ShopifyCredentials): Promise<{id:
         }
       }
     }
-    `;
-    
-    const data = await robustShopifyFetch(creds, query);
-    return data.data?.blogs?.edges?.map((e:any) => e.node) || [];
+  `;
+
+  const data = await robustShopifyFetch(_creds, query);
+  return data.data?.blogs?.edges?.map((e: any) => e.node) || [];
 };
 
-export const createShopifyArticle = async (creds: ShopifyCredentials, blogId: string, article: {
-    title: string, 
-    contentHtml: string, 
-    tags: string[], 
-    excerpt: string, 
-    image?: string,
-    seo?: { title?: string, description?: string }
-}) => {
-    const mutation = `
-      mutation articleCreate($article: ArticleCreateInput!) {
-        articleCreate(article: $article) {
-          article {
-            id
-            handle
-          }
-          userErrors {
-            field
-            message
-          }
+export const createShopifyArticle = async (
+  _creds: ShopifyCredentials,
+  blogId: string,
+  article: {
+    title: string;
+    contentHtml: string;
+    tags: string[];
+    excerpt: string;
+    image?: string;
+    seo?: { title?: string; description?: string };
+  }
+) => {
+  const mutation = `
+    mutation articleCreate($article: ArticleCreateInput!) {
+      articleCreate(article: $article) {
+        article {
+          id
+          handle
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `;
-
-    let imageUrl = article.image || "";
-    if (imageUrl) {
-        if (imageUrl.startsWith('//')) {
-            imageUrl = 'https:' + imageUrl;
-        }
-        if (imageUrl.startsWith('http')) {
-            try {
-               const urlObj = new URL(imageUrl);
-               imageUrl = urlObj.origin + urlObj.pathname;
-            } catch(e) {}
-        } else {
-            imageUrl = "";
-        }
     }
+  `;
 
-    const imageInput = imageUrl 
-        ? { url: imageUrl, altText: article.title } 
-        : undefined;
+  // Map image if exists
+  // FIX: Shopify ArticleImageInput expects 'url', NOT 'src'.
+  let imageInput = undefined;
+  if (article.image) {
+      imageInput = { url: article.image, altText: article.title };
+  }
 
-    const variables = {
-        article: {
-            blogId: blogId,
-            title: article.title || "Untitled SEO Article", 
-            body: article.contentHtml || "<p>Content generation failed.</p>",
-            summary: article.excerpt || "",
-            tags: article.tags || [],
-            image: imageInput,
-            author: { name: "SEO Editor" },
-            isPublished: true,
-            seo: {
-                title: article.seo?.title || article.title,
-                description: article.seo?.description || article.excerpt
-            }
-        }
-    };
-
-    const data = await robustShopifyFetch(creds, mutation, variables);
-    
-    if (!data.data?.articleCreate?.article) {
-        console.error("Shopify articleCreate missing article object. Data:", data);
-        throw new Error("Shopify accepted the request but returned no Article object. Check permissions.");
+  const variables = {
+    article: {
+      blogId,
+      title: article.title,
+      body: article.contentHtml,
+      summary: article.excerpt,
+      tags: article.tags || [],
+      isPublished: true,
+      author: { name: "צוות Kleerix" }, // Required field
+      image: imageInput
+      // seo: ... removed as it is not supported in ArticleCreateInput in this API version
     }
+  };
 
-    return data.data.articleCreate.article;
+  const data = await robustShopifyFetch(_creds, mutation, variables);
+
+  if (!data.data?.articleCreate?.article) {
+     // Check for userErrors
+     if (data.data?.articleCreate?.userErrors?.length > 0) {
+         const msgs = data.data.articleCreate.userErrors.map((e:any) => e.message).join(', ');
+         throw new Error(`Shopify API Validation Error: ${msgs}`);
+     }
+     throw new Error("Shopify accepted request but returned no Article object.");
+  }
+
+  return data.data.articleCreate.article;
 };
