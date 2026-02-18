@@ -8,10 +8,10 @@ import { AIService } from './services/geminiService';
 import { fetchShopifyProducts, updateShopifyProduct, ShopifyCredentials, fetchShopifyBlogs, createShopifyArticle } from './services/shopifyService';
 import { calculateSeoScore } from './services/seoScorer';
 
-// Default credentials - Updated to user provided
+// Default credentials - Clean init
 const DEFAULT_CREDS: ShopifyCredentials = {
-    shop: 'bz9ig0-dy.myshopify.com',
-    token: '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'
+    shop: '',
+    token: ''
 };
 
 export default function App() {
@@ -112,15 +112,19 @@ export default function App() {
     const creds = credsToUse || shopifyCreds;
     if (!creds.shop || !creds.token) return;
 
+    // Sanitize shop url
+    const cleanShop = creds.shop.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const cleanCreds = { ...creds, shop: cleanShop };
+
     setIsShopifyLoading(true);
     setError(null);
     try {
-        const fetched = await fetchShopifyProducts(creds);
+        const fetched = await fetchShopifyProducts(cleanCreds);
         
         // Save success creds
-        localStorage.setItem('seo_shop_creds', JSON.stringify(creds));
+        localStorage.setItem('seo_shop_creds', JSON.stringify(cleanCreds));
         // Update state to match used creds (in case of auto-connect)
-        setShopifyCreds(creds);
+        setShopifyCreds(cleanCreds);
 
         // Initialize State
         setProducts(fetched);

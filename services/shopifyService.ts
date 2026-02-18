@@ -5,44 +5,67 @@ export interface ShopifyCredentials {
 }
 
 // ===============================
-// CLOUD RUN PROXY CONFIG
+// LOCAL VITE PROXY CONFIG
 // ===============================
 
-const PROXY_URL = "https://shopify-proxy-1021730791396.us-west1.run.app/graphql";
-const PROXY_KEY = "abc123"; // change if you updated it in Cloud Run
+// We point to the local proxy defined in vite.config.ts
+const PROXY_URL = "/api/graphql";
 
 // ===============================
-// ROBUST FETCH (VIA CLOUD RUN)
+// ROBUST FETCH (VIA LOCAL PROXY)
 // ===============================
 
-const robustShopifyFetch = async (_creds: ShopifyCredentials, query: string, variables?: any) => {
-  const res = await fetch(PROXY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Proxy-Key": PROXY_KEY
-    },
-    body: JSON.stringify({
-      apiVersion: "2024-04",
-      query,
-      variables
-    })
-  });
+const robustShopifyFetch = async (creds: ShopifyCredentials, query: string, variables?: any) => {
+  // Setup Timeout to prevent "stuck" UI
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds max
 
-  const json = await res.json();
+  try {
+      // 1. Send request to our local Vite proxy
+      // The vite.config.ts router handles the redirection to the specific shop
+      const res = await fetch(PROXY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // 2. Send the Token HERE so Shopify receives it
+          "X-Shopify-Access-Token": creds.token,
+          // 3. Send the Shop Domain so Vite knows where to route the request
+          "X-Shop-Domain": creds.shop
+        },
+        body: JSON.stringify({
+          query,
+          variables
+        }),
+        signal: controller.signal
+      });
 
-  if (!res.ok) {
-    throw new Error(`Proxy HTTP ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
+      // Clear timeout if response received
+      clearTimeout(timeoutId);
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(`HTTP Error ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
+      }
+
+      // 4. Handle GraphQL Errors (Shopify specific)
+      if (json.errors) {
+        const msg = Array.isArray(json.errors)
+          ? json.errors.map((e:any) => e.message).join(" | ")
+          : String(json.errors);
+        throw new Error(`Shopify API Error: ${msg}`);
+      }
+
+      return json;
+
+  } catch (error: any) {
+      if (error.name === 'AbortError') {
+          throw new Error("Connection timed out. Please check your internet or the Shop Domain.");
+      }
+      throw error;
+  } finally {
+      clearTimeout(timeoutId);
   }
-
-  if (json.errors) {
-    const msg = Array.isArray(json.errors)
-      ? json.errors.map((e:any) => e.message).join(" | ")
-      : String(json.errors);
-    throw new Error(`Shopify API Error: ${msg}`);
-  }
-
-  return json;
 };
 
 // ===============================
@@ -61,13 +84,27 @@ const mapShopifyProduct = (node: any) => {
   );
 
   const keyword = keywordMeta ? keywordMeta.node.value : "";
-  const bullets = bulletsMeta ? bulletsMeta.node.value : "";
+  
+  // Handle Selling Bullets (List Type)
+  let bullets = "";
+  if (bulletsMeta && bulletsMeta.node.value) {
+      try {
+          // Check if it's a JSON array string (Shopify List type)
+          const parsed = JSON.parse(bulletsMeta.node.value);
+          if (Array.isArray(parsed)) {
+              // Convert array ["Item 1", "Item 2"] to "• Item 1\n• Item 2" for the editor
+              bullets = parsed.map(b => b.replace(/^•\s*/, '')).map(b => `• ${b}`).join("\n");
+          } else {
+              bullets = String(bulletsMeta.node.value);
+          }
+      } catch (e) {
+          // Fallback if not JSON
+          bullets = String(bulletsMeta.node.value);
+      }
+  }
 
   const options = node.options || [];
-  const option1 = options[0];
-  const option2 = options[1];
-  const option3 = options[2];
-
+  
   return {
     id: node.id,
     name: node.title,
@@ -80,22 +117,22 @@ const mapShopifyProduct = (node: any) => {
     rank_math_title: seo.title || "",
     rank_math_description: seo.description || "",
     rank_math_focus_keyword: keyword,
-    selling_bullets: bullets, // New mapped field
+    selling_bullets: bullets,
     permalink: node.onlineStoreUrl || "",
     
     // Map Option Names & Values
     // Note: We store IDs to allow updating names later
-    option1_id: option1 ? option1.id : "",
-    option1_name: option1 ? option1.name : "",
-    option1_values: option1 ? option1.values.join(", ") : "",
+    option1_id: options[0] ? options[0].id : "",
+    option1_name: options[0] ? options[0].name : "",
+    option1_values: options[0] ? options[0].values.join(", ") : "",
     
-    option2_id: option2 ? option2.id : "",
-    option2_name: option2 ? option2.name : "",
-    option2_values: option2 ? option2.values.join(", ") : "",
+    option2_id: options[1] ? options[1].id : "",
+    option2_name: options[1] ? options[1].name : "",
+    option2_values: options[1] ? options[1].values.join(", ") : "",
     
-    option3_id: option3 ? option3.id : "",
-    option3_name: option3 ? option3.name : "",
-    option3_values: option3 ? option3.values.join(", ") : ""
+    option3_id: options[2] ? options[2].id : "",
+    option3_name: options[2] ? options[2].name : "",
+    option3_values: options[2] ? options[2].values.join(", ") : ""
   };
 };
 
@@ -103,7 +140,7 @@ const mapShopifyProduct = (node: any) => {
 // EXPORTS
 // ===============================
 
-export const fetchShopifyProducts = async (_creds: ShopifyCredentials): Promise<any[]> => {
+export const fetchShopifyProducts = async (creds: ShopifyCredentials): Promise<any[]> => {
   const query = `
     {
       products(first: 50) {
@@ -143,12 +180,12 @@ export const fetchShopifyProducts = async (_creds: ShopifyCredentials): Promise<
     }
   `;
 
-  const data = await robustShopifyFetch(_creds, query);
+  const data = await robustShopifyFetch(creds, query);
   return data.data.products.edges.map((e: any) => mapShopifyProduct(e.node));
 };
 
 export const updateShopifyProduct = async (
-  _creds: ShopifyCredentials,
+  creds: ShopifyCredentials,
   productId: string,
   data: any
 ): Promise<boolean> => {
@@ -180,16 +217,20 @@ export const updateShopifyProduct = async (
     });
   }
 
-  // Selling Bullets
+  // Selling Bullets - Handle as List
   if (data.selling_bullets) {
-    // We treat it as multi_line_text_field (string with newlines)
-    // If your theme expects a list, this might need to be "list.single_line_text_field" and value as JSON string array.
-    // Based on common practices for "bullets text block", multi_line is safest default.
+    // 1. Clean the input string (remove existing bullets, split by newline)
+    const rawLines = data.selling_bullets.split('\n');
+    const cleanList = rawLines
+        .map((line: string) => line.replace(/^•\s*/, '').trim()) // Remove '• ' and whitespace
+        .filter((line: string) => line.length > 0); // Remove empty lines
+
+    // 2. Prepare for Shopify: JSON Stringify for value, correct type for schema
     metafields.push({
       namespace: "custom",
       key: "selling_bullets_a",
-      value: data.selling_bullets,
-      type: "multi_line_text_field"
+      value: JSON.stringify(cleanList), // Must be a stringified JSON array
+      type: "list.single_line_text_field"
     });
   }
 
@@ -205,11 +246,10 @@ export const updateShopifyProduct = async (
       },
       metafields: metafields.length > 0 ? metafields : undefined,
       redirectNewHandle: true
-      // options: [] -- REMOVED: Cannot pass options here in this API version
     }
   };
 
-  await robustShopifyFetch(_creds, productMutation, variables);
+  await robustShopifyFetch(creds, productMutation, variables);
 
   // 2. Update Option Names (if IDs are present)
   // We do this via separate mutations because productUpdate doesn't support renaming options directly via list
@@ -228,7 +268,7 @@ export const updateShopifyProduct = async (
   const updateOptionName = async (optId: string, newName: string) => {
     if (!optId || !newName) return;
     try {
-        await robustShopifyFetch(_creds, optionMutation, {
+        await robustShopifyFetch(creds, optionMutation, {
             productId: productId,
             optionId: optId,
             name: newName
@@ -245,7 +285,7 @@ export const updateShopifyProduct = async (
   return true;
 };
 
-export const fetchShopifyBlogs = async (_creds: ShopifyCredentials) => {
+export const fetchShopifyBlogs = async (creds: ShopifyCredentials) => {
   const query = `
     {
       blogs(first: 20) {
@@ -260,12 +300,12 @@ export const fetchShopifyBlogs = async (_creds: ShopifyCredentials) => {
     }
   `;
 
-  const data = await robustShopifyFetch(_creds, query);
+  const data = await robustShopifyFetch(creds, query);
   return data.data?.blogs?.edges?.map((e: any) => e.node) || [];
 };
 
 export const createShopifyArticle = async (
-  _creds: ShopifyCredentials,
+  creds: ShopifyCredentials,
   blogId: string,
   article: {
     title: string;
@@ -292,7 +332,6 @@ export const createShopifyArticle = async (
   `;
 
   // Map image if exists
-  // FIX: Shopify ArticleImageInput expects 'url', NOT 'src'.
   let imageInput = undefined;
   if (article.image) {
       imageInput = { url: article.image, altText: article.title };
@@ -308,11 +347,10 @@ export const createShopifyArticle = async (
       isPublished: true,
       author: { name: "צוות Kleerix" }, // Required field
       image: imageInput
-      // seo: ... removed as it is not supported in ArticleCreateInput in this API version
     }
   };
 
-  const data = await robustShopifyFetch(_creds, mutation, variables);
+  const data = await robustShopifyFetch(creds, mutation, variables);
 
   if (!data.data?.articleCreate?.article) {
      // Check for userErrors
